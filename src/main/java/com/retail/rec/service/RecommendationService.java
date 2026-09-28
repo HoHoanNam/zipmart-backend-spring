@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,13 @@ public class RecommendationService {
     private final RecRepo recRepo;
     private final BehaviorAnalysisService behaviorAnalysisService;
     private final CollaborativeFilter collaborativeFilter;
+
+    // Guards recomputeAll() against overlapping runs — it's O(n^2) in user
+    // count and does a delete-then-insert per user, so two concurrent runs
+    // (e.g. an unauthenticated caller hammering POST /api/rec/recompute
+    // while the 2am cron is running) would race on the same rows and waste
+    // CPU. See docs/PROJECT-SECURITY-AUDIT.md section 1.
+    private final AtomicBoolean recomputeInProgress = new AtomicBoolean(false);
 
     public RecommendationService(
             RecRepo recRepo,
@@ -38,16 +46,29 @@ public class RecommendationService {
         return recRepo.findByUserIdOrderByScoreDesc(userId, PageRequest.of(0, limit));
     }
 
-    /** Recomputes and upserts recommendations for every user with behavior history. */
+    /**
+     * Recomputes and upserts recommendations for every user with behavior history.
+     *
+     * @return {@code true} if this call actually ran the recompute, {@code false}
+     *     if it was skipped because another recompute was already in progress.
+     */
     @Transactional
-    public void recomputeAll() {
-        Map<UUID, Map<UUID, Double>> allUserVectors = behaviorAnalysisService.buildUserVectors();
-        Instant now = Instant.now();
+    public boolean recomputeAll() {
+        if (!recomputeInProgress.compareAndSet(false, true)) {
+            return false;
+        }
+        try {
+            Map<UUID, Map<UUID, Double>> allUserVectors = behaviorAnalysisService.buildUserVectors();
+            Instant now = Instant.now();
 
-        for (UUID userId : allUserVectors.keySet()) {
-            List<CollaborativeFilter.ScoredProduct> scored =
-                    collaborativeFilter.recommend(userId, allUserVectors, RECOMMENDATIONS_PER_USER);
-            upsertForUser(userId, scored, now);
+            for (UUID userId : allUserVectors.keySet()) {
+                List<CollaborativeFilter.ScoredProduct> scored =
+                        collaborativeFilter.recommend(userId, allUserVectors, RECOMMENDATIONS_PER_USER);
+                upsertForUser(userId, scored, now);
+            }
+            return true;
+        } finally {
+            recomputeInProgress.set(false);
         }
     }
 
