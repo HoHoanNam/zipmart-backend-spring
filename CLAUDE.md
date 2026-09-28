@@ -22,10 +22,11 @@ the same PostgreSQL 17 database.
   `spring-boot-starter-flyway` is now its own starter (not just adding the
   flywaydb dependency directly).
 - Package structure: `controller / service / repository / model / algorithm
-  / scheduler / config`, per `IMPLEMENTATION_PLAN.md` section 5.2 — every
-  new class goes in the layer that matches its role, don't collapse layers.
+  / scheduler / config`, per `docs/PROJECT-IMPLEMENTATION-PLAN.md` (monorepo
+  root) section 5.2 — every new class goes in the layer that matches its
+  role, don't collapse layers.
 - **No Lombok** — every entity/DTO has explicit getters/constructors, per
-  `IMPLEMENTATION_PLAN.md` section 5.3 ("giai đoạn đầu").
+  `docs/PROJECT-IMPLEMENTATION-PLAN.md` section 5.3 ("giai đoạn đầu").
 - `spring.jpa.hibernate.ddl-auto=none` — Hibernate must **never** create or
   alter schema. `BehaviorEvent` maps onto a table this service doesn't own;
   letting Hibernate anywhere near DDL for it would be a real hazard, not
@@ -69,8 +70,8 @@ obvious from the code alone.
 ## Recommendation Algorithm Skill
 
 User-based Collaborative Filtering, split across three files matching
-`IMPLEMENTATION_PLAN.md` section 5.4 exactly — this 3-way split is
-deliberate, not incidental duplication:
+`docs/PROJECT-IMPLEMENTATION-PLAN.md` (monorepo root) section 5.4 exactly —
+this 3-way split is deliberate, not incidental duplication:
 
 - **`algorithm/UserSimilarity.java`** — pure math only: `cosineSimilarity(a, b)`
   between two `Map<UUID, Double>` behavior vectors. No Spring wiring beyond
