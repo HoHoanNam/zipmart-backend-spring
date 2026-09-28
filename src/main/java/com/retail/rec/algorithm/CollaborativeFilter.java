@@ -48,7 +48,8 @@ public class CollaborativeFilter {
                 if (targetVector.containsKey(product.getKey())) {
                     continue; // already seen/bought by the target user
                 }
-                candidateScores.merge(product.getKey(), similarUser.similarity() * product.getValue(), Double::sum);
+                candidateScores.merge(
+                        product.getKey(), similarUser.similarity() * product.getValue(), (a, b) -> a + b);
             }
         }
 

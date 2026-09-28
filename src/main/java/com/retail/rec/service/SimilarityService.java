@@ -37,7 +37,7 @@ public class SimilarityService {
                 .map(entry -> new SimilarUser(
                         entry.getKey(), userSimilarity.cosineSimilarity(targetVector, entry.getValue())))
                 .filter(similarUser -> similarUser.similarity() > 0)
-                .sorted(Comparator.comparingDouble(SimilarUser::similarity).reversed())
+                .sorted(Comparator.comparingDouble((SimilarUser similarUser) -> similarUser.similarity()).reversed())
                 .limit(topK)
                 .collect(Collectors.toList());
     }
